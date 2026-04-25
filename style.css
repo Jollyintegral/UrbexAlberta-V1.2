@@ -493,14 +493,41 @@ header a {
   padding-top: 10px;
   border-top: 1px solid rgba(165, 184, 227, 0.28);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.spot-popup-view .spot-tab-btn,
-.spot-popup-view .edit-spot-btn,
 .spot-popup-view .spot-pane {
   display: none;
+}
+.spot-popup-view .spot-tab-btn,
+.spot-popup-view .edit-spot-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(162, 179, 216, 0.42);
+  background: rgba(122, 145, 206, 0.24);
+  color: #eef3ff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.spot-popup-view .spot-tab-btn:hover,
+.spot-popup-view .edit-spot-btn:hover {
+  background: rgba(142, 166, 230, 0.33);
+}
+.spot-popup-view .spot-tab-btn.is-active {
+  background: rgba(146, 171, 236, 0.4);
+  border-color: rgba(176, 196, 241, 0.62);
 }
 .spot-popup-view .spot-pane.is-active {
   display: block;
