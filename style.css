@@ -1,0 +1,1011 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gate-box {
+  background: #333;
+  padding: 24px;
+  border-radius: 8px;
+  text-align: center;
+  min-width: 260px;
+}
+.gate-box h2 {
+  margin: 0 0 16px 0;
+  color: #fff;
+  font-size: 1.1em;
+}
+.gate-box input {
+  padding: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.gate-box button {
+  padding: 8px 20px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.gate-error {
+  margin: 10px 0 0 0;
+  color: #e66;
+  font-size: 13px;
+  display: none;
+}
+
+header {
+  background: #000000;
+  padding: 10px 20px;
+}
+
+header a {
+  color: white;
+  margin-right: 15px;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+#map {
+  height: calc(100vh - 50px);
+}
+
+@media (max-width: 700px) {
+  header {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+  #addSpotBtn {
+    position: fixed !important;
+    left: 50% !important;
+    bottom: 15px !important;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 100px;
+    max-width: 85vw;
+    font-size: 13px;
+    padding: 10px 18px;
+    white-space: nowrap;
+    text-align: center;
+    box-sizing: border-box;
+    overflow: visible;
+    border-radius: 8px;
+    background: #fff;
+    color: #222;
+    border: 2px solid #222;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    z-index: 1000 !important;
+  }
+  .gate-box {
+    min-width: 0;
+    width: 90vw;
+    padding: 12px;
+  }
+  .leaflet-popup-content-wrapper {
+    max-width: calc(90vw - 16px) !important;
+    width: calc(90vw - 16px) !important;
+    overflow-x: hidden !important;
+  }
+  .spot-popup-view {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 8px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .leaflet-popup-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+  .spot-popup-view .spot-popup-title-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+  }
+  .spot-popup-view .spot-popup-title-row strong {
+    flex: 1 1 auto !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    font-size: 1.1em !important;
+    text-align: left !important;
+  }
+  .spot-popup-view .edit-spot-btn {
+    flex: 0 0 auto !important;
+    padding: 4px 8px !important;
+    margin: 0 !important;
+    font-size: 12px !important;
+    align-self: flex-start !important;
+  }
+  .spot-popup-view .spot-popup-title-row .spot-thumb {
+    flex: 0 0 auto !important;
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 !important;
+    align-self: flex-start !important;
+  }
+  .spot-popup-view .spot-desc {
+    width: 100% !important;
+    max-height: 50vh !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+  .spot-popup-view .spot-edit-name,
+  .spot-popup-view .spot-edit-class,
+  .spot-popup-view .spot-edit-desc,
+  .spot-popup-view .save-edit-spot-btn,
+  .spot-popup-view .delete-edit-spot-btn {
+    width: 100% !important;
+    margin: 6px 0 !important;
+    padding: 8px !important;
+    box-sizing: border-box !important;
+  }
+  .spot-popup-view .save-edit-spot-btn,
+  .spot-popup-view .delete-edit-spot-btn {
+    font-size: 14px !important;
+    padding: 8px 12px !important;
+    min-height: 34px !important;
+    border-radius: 5px !important;
+  }
+  .spot-popup-view .spot-edit-desc {
+    min-height: 60px !important;
+    border: 1px solid #ccc !important;
+    overflow-y: auto !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+  .spot-popup-view .delete-edit-spot-btn {
+    background: #e66 !important;
+    color: #fff !important;
+    border: 1px solid #c00 !important;
+  }
+  .spot-popup-view .edit-status {
+    margin: 6px 0 !important;
+    font-size: 12px !important;
+  }
+  .image-overlay img {
+    max-width: 98vw;
+    max-height: 60vh;
+  }
+}
+
+#addSpotBtn {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+/* Spot popup: thick border, tight spacing, title centered */
+.leaflet-popup-content-wrapper {
+  border: 8px solid #000;
+}
+.leaflet-popup-content {
+  margin: 6px 10px;
+  min-width: 180px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+.spot-popup-view {
+  min-width: 200px;
+  padding: 2px 0;
+  max-width: 400px;
+}
+/* Spot popup title row with edit and delete */
+.spot-popup-view .spot-popup-title-row {
+  position: relative;
+  margin-bottom: 3px;
+  min-height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.spot-popup-view .edit-spot-btn {
+  position: static;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  font-size: 11px;
+  cursor: pointer;
+  background: #e0e0e0;
+  border: 1px solid #000000;
+  border-radius: 3px 0 0 3px;
+  margin: 0;
+  transform: none;
+  top: auto;
+  left: auto;
+  align-self: center;
+  
+}
+.spot-popup-view .spot-popup-title-row strong {
+  flex: 3 3 auto;
+  padding: 0;
+  box-sizing: content-box;
+  font-size: 1em;
+  text-align: center;
+  vertical-align: middle-;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.spot-popup-view .spot-popup-title-row .spot-thumb {
+  position: static;
+  flex: 0 0 auto;
+  margin: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  transform: none;
+  top: auto;
+  right: auto;
+  align-self: center;
+}
+.spot-popup-view .spot-desc {
+  margin: 0 0 2px;
+  font-size: 13px;
+  line-height: 1.32;
+  text-align: center;
+  max-height: 50vh;
+  overflow-y: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  white-space: normal;
+  padding: 3px 6px;
+  box-sizing: border-box;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.spot-popup-view .spot-desc img {
+  max-width: 100%;
+}
+.spot-popup-view .spot-popup-tabs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 0 4px;
+}
+.spot-popup-view .spot-tab-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+  border: 1px solid #a7a7a7;
+  background: #efefef;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.spot-popup-view .spot-tab-btn.is-active {
+  background: #dcdcdc;
+  border-color: #666;
+  font-weight: 700;
+}
+.spot-popup-view .spot-pane {
+  display: none;
+}
+.spot-popup-view .spot-pane.is-active {
+  display: block;
+}
+.spot-popup-view .spot-comments-wrap {
+  margin-top: 4px;
+  border-top: 1px solid #d8d8d8;
+  padding-top: 6px;
+}
+.spot-popup-view .spot-comments-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.spot-popup-view .spot-comments-list {
+  max-height: 130px;
+  overflow-y: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  padding: 6px;
+  background: #fafafa;
+}
+.spot-popup-view .spot-comment-item + .spot-comment-item {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #d5d5d5;
+}
+.spot-popup-view .spot-comment-delete-btn {
+  padding: 1px 5px;
+  font-size: 10px;
+  border: 1px solid #ccaaaa;
+  background: #fff7f7;
+  color: #9a5a5a;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.spot-popup-view .spot-comment-meta {
+  font-size: 11px;
+  color: #666;
+}
+.spot-popup-view .spot-comment-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.spot-popup-view .spot-comment-text {
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.spot-popup-view .spot-comment-empty {
+  font-size: 12px;
+  color: #777;
+}
+.spot-popup-view .spot-comment-form {
+  margin-top: 6px;
+}
+.spot-popup-view .spot-comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 44px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 6px;
+  font-size: 12px;
+}
+.spot-popup-view .spot-comment-save-btn {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.spot-popup-view .spot-comment-status {
+  margin: 4px 0 0;
+  font-size: 11px;
+  min-height: 14px;
+}
+.spot-popup-view .spot-maps-link {
+  display: inline-block;
+  margin-top: 2px;
+  color: #0b57d0;
+  text-decoration: underline;
+  font-size: 12px;
+}
+.spot-popup-view .spot-maps-link-wrap {
+  text-align: center;
+  margin-bottom: 4px;
+}
+/* Modern dark popup card style */
+.leaflet-popup-content-wrapper {
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: #2f3b56 !important;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35) !important;
+  overflow: hidden;
+}
+.leaflet-popup-content {
+  margin: 0 !important;
+  min-width: 280px;
+  max-width: 360px;
+  overflow: hidden;
+}
+.leaflet-popup-tip {
+  background: #2f3b56 !important;
+  box-shadow: none !important;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: #e5eaf7;
+  font-size: 24px;
+  padding: 8px 10px 0 0;
+  font-weight: 500;
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #ffffff;
+}
+.spot-popup-view {
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  color: #e7edf7;
+}
+.spot-popup-view .spot-popup-title-row {
+  margin: 0;
+  padding: 14px 14px 0;
+  display: block;
+}
+.spot-popup-view .spot-popup-title-row .spot-thumb {
+  width: 100%;
+  height: 172px;
+  margin: 0;
+  border: 0;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+.spot-popup-view .spot-popup-title-row .spot-thumb.spot-thumb-empty {
+  background: linear-gradient(135deg, #344567 0%, #2a3752 55%, #202b42 100%);
+}
+.spot-popup-view .spot-popup-body {
+  padding: 12px 14px 14px;
+}
+.spot-popup-view .spot-popup-name {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 27px;
+  font-size: clamp(18px, 3.6vw, 27px);
+  line-height: 1.1;
+  color: #89a0ff;
+  font-weight: 700;
+}
+.spot-popup-view .spot-desc {
+  margin: 0;
+  padding: 0;
+  max-height: 170px;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #f0f4fc;
+  background: transparent;
+}
+.spot-popup-view .spot-desc p:first-child {
+  margin-top: 0;
+}
+.spot-popup-view .spot-desc p:last-child {
+  margin-bottom: 0;
+}
+.spot-popup-view .spot-popup-tabs {
+  margin: 10px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(165, 184, 227, 0.28);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.spot-popup-view .spot-tab-btn,
+.spot-popup-view .edit-spot-btn,
+.spot-popup-view .spot-pane {
+  display: none;
+}
+.spot-popup-view .spot-pane.is-active {
+  display: block;
+}
+.spot-popup-view .spot-comments-wrap {
+  margin: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.spot-popup-view .spot-comments-list {
+  max-height: 150px;
+  border: 1px solid rgba(171, 189, 225, 0.25);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(14, 20, 34, 0.26);
+}
+.spot-popup-view .spot-comment-item + .spot-comment-item {
+  border-top: 1px dashed rgba(178, 194, 228, 0.35);
+}
+.spot-popup-view .spot-comment-meta {
+  color: #b8c6e6;
+}
+.spot-popup-view .spot-comment-text {
+  color: #f0f5ff;
+}
+.spot-popup-view .spot-comment-empty {
+  color: #bac7e3;
+}
+.spot-popup-view .spot-comment-input {
+  border: 1px solid rgba(171, 188, 225, 0.4);
+  border-radius: 10px;
+  background: rgba(10, 16, 29, 0.2);
+  color: #f2f6ff;
+}
+.spot-popup-view .spot-comment-save-btn {
+  margin-top: 8px;
+  border: 1px solid rgba(162, 179, 216, 0.45);
+  border-radius: 999px;
+  background: rgba(123, 148, 214, 0.28);
+  color: #f4f8ff;
+  padding: 5px 12px;
+  font-weight: 600;
+}
+.spot-popup-view .spot-comment-save-btn:hover {
+  background: rgba(146, 171, 236, 0.35);
+}
+.spot-popup-view .spot-comment-status {
+  color: #d4dff5;
+}
+.spot-popup-view .spot-maps-link-wrap {
+  margin: 4px 0 0;
+  text-align: left;
+}
+.spot-popup-view .spot-maps-link {
+  margin: 0;
+  color: #8fa3ff;
+  text-decoration: none;
+  font-size: 13px;
+}
+.spot-popup-view .spot-edit-name,
+.spot-popup-view .spot-edit-class {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  margin: 0 0 8px;
+  border-radius: 9px;
+  border: 1px solid rgba(168, 187, 230, 0.4);
+  background: rgba(11, 18, 33, 0.24);
+  color: #f1f6ff;
+  padding: 0 11px;
+  font-size: 14px;
+}
+.spot-popup-view .spot-edit-class option {
+  color: #101828;
+}
+.spot-popup-view .spot-edit-desc {
+  min-height: 92px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  border: 1px solid rgba(168, 187, 230, 0.4);
+  border-radius: 11px;
+  background: rgba(11, 18, 33, 0.2);
+  color: #f2f6ff;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.spot-popup-view .spot-edit-desc:focus,
+.spot-popup-view .spot-edit-name:focus,
+.spot-popup-view .spot-edit-class:focus,
+.spot-popup-view .spot-comment-input:focus {
+  outline: none;
+  border-color: rgba(160, 186, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(146, 171, 236, 0.22);
+}
+.spot-popup-view .spot-desc-toolbar {
+  display: flex;
+  gap: 7px;
+  margin: 8px 0;
+}
+.spot-popup-view .spot-desc-tool-btn {
+  border: 1px solid rgba(162, 179, 216, 0.45);
+  border-radius: 999px;
+  background: rgba(123, 148, 214, 0.24);
+  color: #f4f8ff;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.spot-popup-view .spot-desc-tool-btn:hover {
+  background: rgba(146, 171, 236, 0.34);
+}
+.spot-popup-view .save-edit-spot-btn,
+.spot-popup-view .delete-edit-spot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  margin-top: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(162, 179, 216, 0.45);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.spot-popup-view .save-edit-spot-btn {
+  background: rgba(123, 148, 214, 0.3);
+  color: #f4f8ff;
+}
+.spot-popup-view .save-edit-spot-btn:hover {
+  background: rgba(146, 171, 236, 0.38);
+}
+.spot-popup-view .delete-edit-spot-btn {
+  margin-left: 8px;
+  background: rgba(194, 104, 123, 0.23);
+  border-color: rgba(231, 150, 167, 0.46);
+  color: #ffe8ec;
+}
+.spot-popup-view .delete-edit-spot-btn:hover {
+  background: rgba(211, 117, 139, 0.3);
+}
+.spot-popup-view .edit-status {
+  margin: 8px 0 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: #d9e5ff;
+}.spot-popup-view .spot-maps-link:hover {
+  text-decoration: underline;
+  color: #a8b7ff;
+}
+@media (max-width: 640px) {
+  .leaflet-popup-content {
+    min-width: 260px;
+  }
+  .spot-popup-view .spot-popup-title-row .spot-thumb {
+    height: 150px;
+  }
+}
+.image-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.image-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.coord-search-control {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  min-width: 176px;
+}
+
+.leaflet-top.leaflet-left .coord-search-control {
+  float: left;
+  clear: none;
+  margin-top: 10px;
+  margin-left: 6px;
+}
+
+.coord-search-form {
+  display: flex;
+  gap: 4px;
+}
+
+.coord-search-input {
+  width: 120px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  outline: none;
+  box-shadow: none;
+}
+
+.coord-search-btn {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid #777;
+  border-radius: 3px;
+  background: #f6f6f6;
+  cursor: pointer;
+  outline: none;
+  box-shadow: none;
+}
+
+.coord-search-btn:hover {
+  background: #ececec;
+}
+
+.coord-search-error {
+  margin-top: 4px;
+  min-height: 14px;
+  font-size: 11px;
+  color: #b00020;
+}
+
+.coord-search-results {
+  display: none;
+  list-style: none;
+  margin: 4px 0 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.coord-search-results li {
+  margin: 0;
+  padding: 0;
+}
+
+.coord-search-result-btn {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.coord-search-results li:last-child .coord-search-result-btn {
+  border-bottom: 0;
+}
+
+.coord-search-result-btn:hover {
+  background: #f5f5f5;
+}
+
+/* Unified Blue Theme (Site-wide) */
+:root {
+  --ui-bg-0: #0f172a;
+  --ui-bg-1: #1a2540;
+  --ui-bg-2: #2f3b56;
+  --ui-bg-3: rgba(20, 31, 54, 0.78);
+  --ui-line: rgba(166, 185, 255, 0.35);
+  --ui-line-strong: rgba(166, 185, 255, 0.55);
+  --ui-text: #eaf0ff;
+  --ui-text-soft: #c8d5f3;
+  --ui-accent: #8fa3ff;
+  --ui-accent-2: #a8b7ff;
+  --ui-danger: #c86b7f;
+}
+
+body {
+  font-family: "Segoe UI", "Inter", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ui-text);
+  background: var(--ui-bg-0);
+}
+
+header {
+  background: linear-gradient(180deg, #0b1220 0%, #0a101c 100%);
+  border-bottom: 1px solid rgba(159, 178, 224, 0.24);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32);
+}
+
+header a {
+  color: #f3f7ff;
+  font-size: 24px;
+  font-size: clamp(20px, 1.5vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.15px;
+  transition: color 0.18s ease;
+}
+
+header a:hover {
+  color: var(--ui-accent-2);
+}
+
+.gate {
+  background: radial-gradient(circle at 12% 10%, #1d2a49 0%, #0f172a 48%, #0b1020 100%);
+}
+
+.gate-box {
+  background: rgba(24, 35, 59, 0.94);
+  border: 1px solid var(--ui-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.42);
+  color: var(--ui-text);
+}
+
+.gate-box h2 {
+  color: #edf3ff;
+}
+
+.gate-box input {
+  border: 1px solid rgba(171, 188, 225, 0.42);
+  border-radius: 10px;
+  background: rgba(11, 18, 33, 0.28);
+  color: #f1f6ff;
+}
+
+.gate-box input:focus {
+  outline: none;
+  border-color: rgba(160, 186, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(146, 171, 236, 0.2);
+}
+
+.gate-box button,
+#addSpotBtn,
+.coord-search-btn,
+.coord-search-result-btn,
+.spot-popup-view button {
+  font-family: inherit;
+}
+
+.gate-box button,
+#addSpotBtn {
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 999px;
+  background: rgba(123, 148, 214, 0.28);
+  color: #f4f8ff;
+  font-weight: 700;
+}
+
+.gate-box button:hover,
+#addSpotBtn:hover {
+  background: rgba(146, 171, 236, 0.4);
+}
+
+#addSpotBtn {
+  box-shadow: 0 8px 20px rgba(9, 14, 28, 0.45);
+  padding: 8px 14px;
+}
+
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+  background-color: rgba(18, 29, 49, 0.88) !important;
+  color: #edf3ff !important;
+  border-color: rgba(164, 183, 223, 0.42) !important;
+}
+
+.leaflet-control-layers-toggle {
+  background-image: url("https://unpkg.com/leaflet@1.9.4/dist/images/layers.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 16px 16px !important;
+}
+
+.leaflet-bar a:hover,
+.leaflet-control-layers-toggle:hover {
+  background-color: rgba(37, 55, 88, 0.92) !important;
+  color: #ffffff !important;
+}
+
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+  .leaflet-control-layers-toggle {
+    background-image: url("https://unpkg.com/leaflet@1.9.4/dist/images/layers-2x.png") !important;
+    background-size: 16px 16px !important;
+  }
+}
+
+.leaflet-control-layers {
+  background: rgba(20, 31, 54, 0.92) !important;
+  color: var(--ui-text) !important;
+  border: 1px solid var(--ui-line) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34) !important;
+}
+
+.coord-search-control {
+  background: transparent;
+}
+
+.coord-search-form {
+  background: var(--ui-bg-3);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.coord-search-input {
+  width: 132px;
+  border: 1px solid rgba(172, 189, 225, 0.38);
+  border-radius: 7px;
+  background: rgba(10, 16, 29, 0.34);
+  color: #eaf1ff;
+}
+
+.coord-search-input::placeholder {
+  color: #b7c5e6;
+}
+
+.coord-search-input:focus {
+  border-color: rgba(160, 186, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(146, 171, 236, 0.2);
+}
+
+.coord-search-btn {
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 7px;
+  background: rgba(123, 148, 214, 0.3);
+  color: #f3f7ff;
+  font-weight: 600;
+}
+
+.coord-search-btn:hover {
+  background: rgba(146, 171, 236, 0.42);
+}
+
+.coord-search-error {
+  color: #f4a8b6;
+}
+
+.coord-search-results {
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  background: rgba(20, 31, 54, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+.coord-search-result-btn {
+  color: #eaf0ff;
+  background: transparent;
+  border-bottom: 1px solid rgba(162, 179, 216, 0.24);
+}
+
+.coord-search-result-btn:hover {
+  background: rgba(143, 163, 255, 0.16);
+}
+
+@media (max-width: 700px) {
+  header {
+    padding: 9px 10px;
+  }
+
+  header a {
+    font-size: 18px;
+    margin-right: 12px;
+  }
+
+  #addSpotBtn {
+    border: 1px solid var(--ui-line-strong) !important;
+    background: rgba(123, 148, 214, 0.32) !important;
+    color: #f4f8ff !important;
+    box-shadow: 0 8px 20px rgba(9, 14, 28, 0.45) !important;
+  }
+}
+/* Add-spot popup (create mode) theme */
+.spot-popup-view.spot-create-form {
+  min-width: 260px;
+  padding: 0;
+}
+
+.spot-popup-view .spot-create-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #89a0ff;
+}
+
+.spot-popup-view .spot-create-class,
+.spot-popup-view .spot-create-name {
+  margin-bottom: 8px;
+}
+
+.spot-popup-view .spot-create-desc {
+  min-height: 84px;
+}
+
+.spot-popup-view .spot-create-save-btn {
+  margin-top: 10px;
+}
+
+.spot-popup-view .spot-create-status {
+  margin-top: 8px;
+}
