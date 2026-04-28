@@ -20,6 +20,7 @@ const storage = getStorage(app);
 const SPOTS_COLLECTION = 'spots';
 let userRole = null;
 let map; // Global map variable
+let spotClusterGroup;
 const spotSearchIndex = [];
 
 function normalizeRole(role) {
@@ -66,12 +67,22 @@ function getSpotSearchMatches(query, limit = 8) {
 }
 
 function focusSpotResult(match) {
-  if (!match || !match.marker || !map || !map.hasLayer(match.marker)) return;
+  if (!match || !match.marker || !map) return;
+  const markerAvailable = spotClusterGroup
+    ? spotClusterGroup.hasLayer(match.marker)
+    : map.hasLayer(match.marker);
+  if (!markerAvailable) return;
   const latLng = match.marker.getLatLng();
+  if (spotClusterGroup && typeof spotClusterGroup.zoomToShowLayer === 'function') {
+    map.flyTo([latLng.lat, latLng.lng], Math.max(map.getZoom(), 14), { duration: 0.7 });
+    spotClusterGroup.zoomToShowLayer(match.marker, () => {
+      match.marker.openPopup();
+    });
+    return;
+  }
+
   map.flyTo([latLng.lat, latLng.lng], Math.max(map.getZoom(), 16), { duration: 0.7 });
-  setTimeout(() => {
-    match.marker.openPopup();
-  }, 450);
+  setTimeout(() => match.marker.openPopup(), 450);
 }
 
 function parseCoordinateInput(input) {
@@ -193,6 +204,64 @@ function addCoordinateSearchControl() {
   coordControl.addTo(map);
 }
 
+function formatLatLng(latlng) {
+  if (!latlng) return '';
+  return `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(ta);
+  return copied;
+}
+
+function buildMapContextMenu(latlng) {
+  const coordsText = formatLatLng(latlng);
+  const mapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(coordsText)}`;
+  const wrap = document.createElement('div');
+  wrap.className = 'coord-context-menu';
+  wrap.innerHTML = `
+    <button type="button" class="coord-context-action" data-action="copy">Copy coordinates</button>
+    <button type="button" class="coord-context-action" data-action="google">Open in Google Maps</button>
+    <div class="coord-context-value">${escapeHtml(coordsText)}</div>
+    <p class="coord-context-status" aria-live="polite"></p>
+  `;
+
+  const statusEl = wrap.querySelector('.coord-context-status');
+  const copyBtn = wrap.querySelector('[data-action="copy"]');
+  const googleBtn = wrap.querySelector('[data-action="google"]');
+
+  copyBtn.onclick = async (e) => {
+    e.preventDefault();
+    try {
+      const copied = await copyTextToClipboard(coordsText);
+      statusEl.textContent = copied ? 'Coordinates copied.' : 'Could not copy coordinates.';
+    } catch (err) {
+      statusEl.textContent = 'Could not copy coordinates.';
+    }
+  };
+
+  googleBtn.onclick = (e) => {
+    e.preventDefault();
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  return wrap;
+}
+
 function normalizeSpotClass(value) {
   if (value === 'default' || value === 'confirmed' || value === 'risky' || value === 'unsure') return value;
   // Backward compatibility: old "abandoned" class now maps to "unsure" (yellow).
@@ -237,7 +306,7 @@ async function loadSpots() {
       const spotClass = normalizeSpotClass(d.spotClass);
       const spotComments = Array.isArray(d.comments) ? d.comments : [];
       const spotName = d.name || 'Unnamed spot';
-      const m = L.marker([lat, lng], { draggable: false, icon: getSpotIcon(spotClass) }).addTo(map);
+      const m = L.marker([lat, lng], { draggable: false, icon: getSpotIcon(spotClass) }).addTo(spotClusterGroup || map);
       m._spotId = docSnap.id;
       m._spotClass = spotClass;
       m._spotComments = spotComments;
@@ -326,6 +395,18 @@ function runMapApp() {
 
   // Default view
   hybrid.addTo(map);
+  if (typeof L.markerClusterGroup === 'function') {
+    spotClusterGroup = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      disableClusteringAtZoom: 15,
+      maxClusterRadius: 55
+    });
+  } else {
+    console.warn('Leaflet marker clustering plugin not available. Falling back to regular markers.');
+    spotClusterGroup = L.layerGroup();
+  }
+  map.addLayer(spotClusterGroup);
 
   // Layer switcher
   const baseMaps = {
@@ -338,6 +419,18 @@ function runMapApp() {
     position: 'topright'
   }).addTo(map);
   addCoordinateSearchControl();
+
+  map.on('contextmenu', (e) => {
+    const popupContent = buildMapContextMenu(e.latlng);
+    L.popup({
+      minWidth: 260,
+      maxWidth: 280,
+      className: 'coord-context-popup'
+    })
+      .setLatLng(e.latlng)
+      .setContent(popupContent)
+      .openOn(map);
+  });
 
   // Add Street View control to map (plugin)
   if (window.L && typeof L.control.streetView === 'function') {
@@ -363,7 +456,7 @@ function runMapApp() {
   // Map click handler
   map.on("click", async function (e) {
     if (isVisitorRole() || !addMode) return;
-    const newMarker = L.marker(e.latlng, { draggable: true, icon: getSpotIcon('default') }).addTo(map);
+    const newMarker = L.marker(e.latlng, { draggable: true, icon: getSpotIcon('default') }).addTo(spotClusterGroup || map);
     newMarker._spotClass = 'default';
     newMarker._spotComments = [];
     const wrap = document.createElement('div');
@@ -683,7 +776,11 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
         const { deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
         removeSpotSearchEntry(spotId);
-        map.removeLayer(marker);
+        if (spotClusterGroup && spotClusterGroup.hasLayer(marker)) {
+          spotClusterGroup.removeLayer(marker);
+        } else {
+          map.removeLayer(marker);
+        }
       } catch (err) {
         alert('Failed to delete spot: ' + (err.code || err.message || String(err)));
       }

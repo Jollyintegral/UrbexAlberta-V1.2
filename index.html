@@ -10,6 +10,14 @@
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+  />
 
   <!-- Your CSS -->
   <link rel="stylesheet" href="style.css">
@@ -26,8 +34,8 @@
   </div>
 
 <header>
-  <a href="#">Map</a>
-  <a href="#">Locations</a>
+  <a href="index.html" class="top-nav-link is-active">Map</a>
+  <a href="resources.html" class="top-nav-link">Resources</a>
 </header>
 
 <button id="addSpotBtn">Add Spot</button>
@@ -37,7 +45,7 @@
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script type="module" src="script.js"></script>
 </body>
 </html>
-

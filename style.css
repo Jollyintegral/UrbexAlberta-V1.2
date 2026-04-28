@@ -1036,3 +1036,208 @@ header a:hover {
 .spot-popup-view .spot-create-status {
   margin-top: 8px;
 }
+
+.coord-context-popup .leaflet-popup-content {
+  margin: 0;
+}
+
+.coord-context-menu {
+  min-width: 240px;
+  padding: 10px;
+  color: #eaf0ff;
+}
+
+.coord-context-action {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin: 0 0 7px;
+  border: 1px solid rgba(166, 185, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(143, 163, 255, 0.14);
+  color: #eef4ff;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.coord-context-action:hover {
+  background: rgba(143, 163, 255, 0.24);
+}
+
+.coord-context-value {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(166, 185, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(10, 16, 29, 0.45);
+  color: #c8d5f3;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+}
+
+.coord-context-status {
+  min-height: 16px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #c8d5f3;
+}
+
+@media (max-width: 700px) {
+  .coord-context-menu {
+    min-width: 210px;
+    padding: 9px;
+  }
+}
+
+.top-nav-link {
+  opacity: 0.88;
+}
+
+.top-nav-link.is-active {
+  opacity: 1;
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.resources-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at 70% 8%, rgba(45, 76, 138, 0.28) 0, rgba(12, 20, 36, 0) 45%), #0b1324;
+}
+
+.resources-main {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 26px 20px 34px;
+}
+
+.resources-hero {
+  margin: 2px 0 18px;
+  padding: 24px 26px;
+  border: 1px solid rgba(166, 185, 255, 0.3);
+  border-radius: 14px;
+  background: linear-gradient(120deg, rgba(24, 45, 82, 0.92), rgba(19, 33, 62, 0.94));
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+.resources-hero h1 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 3.1vw, 42px);
+  line-height: 1.08;
+  color: #f2f7ff;
+}
+
+.resources-hero p {
+  margin: 0;
+  color: #d3def4;
+  font-size: clamp(13px, 1.4vw, 17px);
+}
+
+.resources-list-wrap {
+  border: 1px solid rgba(166, 185, 255, 0.24);
+  border-radius: 14px;
+  background: rgba(15, 26, 47, 0.84);
+  padding: 14px;
+}
+
+.resources-list-title {
+  margin: 2px 4px 14px;
+  font-size: 19px;
+  color: #ecf2ff;
+}
+
+.resource-item {
+  margin: 0 0 8px;
+  border: 1px solid rgba(162, 182, 223, 0.34);
+  border-radius: 10px;
+  background: rgba(31, 47, 77, 0.42);
+}
+
+.resource-item summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 11px 12px;
+  font-weight: 700;
+  color: #eef3ff;
+}
+
+.resource-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.resource-item[open] summary {
+  border-bottom: 1px solid rgba(162, 182, 223, 0.26);
+}
+
+.resource-item p {
+  margin: 10px 12px 8px;
+  color: #d0ddf8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.resource-item a {
+  display: inline-block;
+  margin: 0 12px 12px;
+  padding: 8px 11px;
+  border: 1px solid rgba(166, 185, 255, 0.4);
+  border-radius: 9px;
+  color: #f4f8ff;
+  background: rgba(143, 163, 255, 0.18);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.resource-item a:hover {
+  background: rgba(143, 163, 255, 0.3);
+}
+
+.marker-cluster-small {
+  background: rgba(77, 164, 204, 0.22);
+}
+
+.marker-cluster-small div {
+  background: linear-gradient(145deg, rgba(113, 203, 227, 0.92), rgba(80, 163, 192, 0.92));
+  color: #f6fcff;
+}
+
+.marker-cluster-medium {
+  background: rgba(107, 140, 212, 0.22);
+}
+
+.marker-cluster-medium div {
+  background: linear-gradient(145deg, rgba(140, 169, 239, 0.94), rgba(98, 122, 191, 0.94));
+  color: #f6f8ff;
+}
+
+.marker-cluster-large {
+  background: rgba(86, 102, 186, 0.22);
+}
+
+.marker-cluster-large div {
+  background: linear-gradient(145deg, rgba(123, 133, 221, 0.96), rgba(78, 89, 179, 0.96));
+  color: #f8f9ff;
+}
+
+@media (max-width: 700px) {
+  .resources-main {
+    padding: 14px 10px 20px;
+  }
+
+  .resources-hero {
+    padding: 16px 14px;
+    margin-bottom: 12px;
+  }
+
+  .resources-hero h1 {
+    font-size: 28px;
+  }
+
+  .resources-list-wrap {
+    padding: 10px;
+  }
+
+  .resource-item summary {
+    font-size: 14px;
+  }
+}
