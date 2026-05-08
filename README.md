@@ -1,4 +1,4 @@
-# Urbex-Alberta-V1.2
+# Urbex-Alberta-V1.3
 **Quick Information**
 The site may need a minute to load when first opening, after loading, it should be good. 
 The site may be laggy, have certain bugs, this is a BETA version, in developing.
