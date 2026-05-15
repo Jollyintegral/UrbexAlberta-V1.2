@@ -1,9 +1,17 @@
-// --- Firebase (Firestore for storing spots) ---
+﻿// --- Firebase (Firestore for storing spots) ---
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { 
-  getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, getDoc 
+  getFirestore, collection, addDoc, getDocs, serverTimestamp, doc, updateDoc, getDoc, setDoc
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut,
+  signInAnonymously
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBqUaNlFlKcyl86kaDDN196eRTGOJtlxkY",
@@ -17,14 +25,40 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 const SPOTS_COLLECTION = 'spots';
+const ROLE_RANK = { visitor: 0, member: 1, editor: 2, admin: 3, owner: 4 };
+const SPOTS_CACHE_KEY = 'spotsCacheV1';
+const SPOTS_CACHE_TS_KEY = 'spotsCacheTsV1';
+const SPOTS_CACHE_TTL_MS = 120000;
+let guestMode = false;
 let userRole = null;
+let currentUser = null;
 let map; // Global map variable
 let spotClusterGroup;
 const spotSearchIndex = [];
+let activeLinkControlsCloser = null;
 
 function normalizeRole(role) {
-  return (role || '').toString().trim().toLowerCase();
+  const value = (role || '').toString().trim().toLowerCase();
+  if (value === 'owner' || value === 'admin' || value === 'editor' || value === 'member' || value === 'visitor') return value;
+  return 'visitor';
+}
+
+function roleLabel(role) {
+  const r = normalizeRole(role);
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+
+function normalizeVisibilityRole(role) {
+  const value = (role || '').toString().trim().toLowerCase();
+  if (value === 'visitor' || value === 'member' || value === 'editor') return value;
+  return 'visitor';
+}
+
+function roleAtLeast(role, minimum) {
+  return (ROLE_RANK[normalizeRole(role)] ?? 0) >= (ROLE_RANK[normalizeRole(minimum)] ?? 0);
 }
 
 function isVisitorRole() {
@@ -32,7 +66,16 @@ function isVisitorRole() {
 }
 
 function isAdminRole() {
-  return normalizeRole(userRole) === 'admin';
+  const role = normalizeRole(userRole);
+  return role === 'admin' || role === 'owner';
+}
+
+function canEditSpots() {
+  return roleAtLeast(userRole, 'editor');
+}
+
+function canViewSpot(minRole) {
+  return roleAtLeast(userRole, normalizeVisibilityRole(minRole || 'visitor'));
 }
 
 function upsertSpotSearchEntry(spotId, name, marker) {
@@ -40,10 +83,11 @@ function upsertSpotSearchEntry(spotId, name, marker) {
   const existing = spotSearchIndex.find((entry) => entry.spotId === spotId);
   if (existing) {
     existing.name = normalizedName;
+    existing.nameLower = normalizedName.toLowerCase();
     existing.marker = marker;
     return;
   }
-  spotSearchIndex.push({ spotId, name: normalizedName, marker });
+  spotSearchIndex.push({ spotId, name: normalizedName, nameLower: normalizedName.toLowerCase(), marker });
 }
 
 function removeSpotSearchEntry(spotId) {
@@ -58,9 +102,8 @@ function getSpotSearchMatches(query, limit = 8) {
   const startsWith = [];
   const includes = [];
   for (const entry of spotSearchIndex) {
-    const nameLower = entry.name.toLowerCase();
-    if (nameLower.startsWith(q)) startsWith.push(entry);
-    else if (nameLower.includes(q)) includes.push(entry);
+    if (entry.nameLower.startsWith(q)) startsWith.push(entry);
+    else if (entry.nameLower.includes(q)) includes.push(entry);
   }
 
   return [...startsWith, ...includes].slice(0, limit);
@@ -188,6 +231,7 @@ function addCoordinateSearchControl() {
       focusSpotResult(matches[0]);
     });
 
+    let searchDebounceTimer = null;
     input.addEventListener('input', () => {
       if (error.textContent) error.textContent = '';
       const query = input.value.trim();
@@ -195,7 +239,10 @@ function addCoordinateSearchControl() {
         clearResults();
         return;
       }
-      renderResults(getSpotSearchMatches(query, 8));
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        renderResults(getSpotSearchMatches(query, 8));
+      }, 180);
     });
 
     return container;
@@ -269,14 +316,27 @@ function normalizeSpotClass(value) {
   return 'default';
 }
 
+function makeMinimalPinDataUrl(fillColor) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 40">
+    <defs>
+      <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="1.6" stdDeviation="1.2" flood-color="#000" flood-opacity=".28"/>
+      </filter>
+    </defs>
+    <path filter="url(#s)" d="M14 2C7.9 2 3 6.9 3 13c0 8.5 9.5 18.7 10 19.2a1.4 1.4 0 0 0 2 0C15.5 31.7 25 21.5 25 13c0-6.1-4.9-11-11-11z" fill="${fillColor}"/>
+    <circle cx="14" cy="13" r="6.2" fill="#f4f8ff"/>
+  </svg>`;
+  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+}
+
 const MARKER_ICON_URLS = {
-  default: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  confirmed: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-  risky: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-  unsure: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png'
+  default: makeMinimalPinDataUrl('#6f86bf'),
+  confirmed: makeMinimalPinDataUrl('#33c06d'),
+  risky: makeMinimalPinDataUrl('#ef4f76'),
+  unsure: makeMinimalPinDataUrl('#e7c74b')
 };
 
-const MARKER_SHADOW_URL = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+const MARKER_SHADOW_URL = '';
 const spotIconCache = {};
 
 // Marker icon factory using Leaflet default marker style with class colors.
@@ -285,80 +345,336 @@ function getSpotIcon(spotClass) {
   if (!spotIconCache[normalized]) {
     spotIconCache[normalized] = L.icon({
       iconUrl: MARKER_ICON_URLS[normalized],
-      shadowUrl: MARKER_SHADOW_URL,
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
+      shadowUrl: MARKER_SHADOW_URL || undefined,
+      iconSize: [28, 40],
+      iconAnchor: [14, 36],
+      popupAnchor: [1, -30]
     });
   }
   return spotIconCache[normalized];
 }
 
+function cacheSpotsForSession(spots) {
+  try {
+    sessionStorage.setItem(SPOTS_CACHE_KEY, JSON.stringify(spots));
+    sessionStorage.setItem(SPOTS_CACHE_TS_KEY, String(Date.now()));
+  } catch {}
+}
+
+function getCachedSpots() {
+  try {
+    const ts = Number(sessionStorage.getItem(SPOTS_CACHE_TS_KEY) || '0');
+    if (!ts || (Date.now() - ts) > SPOTS_CACHE_TTL_MS) return null;
+    const raw = sessionStorage.getItem(SPOTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSpotsCache() {
+  try {
+    sessionStorage.removeItem(SPOTS_CACHE_KEY);
+    sessionStorage.removeItem(SPOTS_CACHE_TS_KEY);
+  } catch {}
+}
+
+function renderSpotData(spotId, d) {
+  const lat = d.lat ?? d.latitude;
+  const lng = d.lng ?? d.longitude;
+  if (lat == null || lng == null) return;
+  const spotClass = normalizeSpotClass(d.spotClass);
+  const spotComments = Array.isArray(d.comments) ? d.comments : [];
+  const spotName = d.name || 'Unnamed spot';
+  const minRole = normalizeVisibilityRole(d.minRole || 'visitor');
+  if (!canViewSpot(minRole)) return;
+  const m = L.marker([lat, lng], { draggable: false, icon: getSpotIcon(spotClass) }).addTo(spotClusterGroup || map);
+  m._spotId = spotId;
+  m._spotClass = spotClass;
+  m._spotComments = spotComments;
+  m._spotName = spotName;
+  m._spotDesc = d.description || '';
+  m._spotImageUrl = d.imageUrl || '';
+  m._spotMinRole = minRole;
+  m.bindPopup('<div class="spot-popup-loading">Loading...</div>', { minWidth: 220 });
+  m.on('popupopen', () => {
+    m.getPopup().setContent(createSpotPopup({
+      marker: m,
+      spotId: m._spotId,
+      name: m._spotName || 'Unnamed spot',
+      desc: m._spotDesc || '',
+      imageUrl: m._spotImageUrl || '',
+      spotClass: m._spotClass || 'default',
+      minRole: m._spotMinRole || 'visitor',
+      comments: m._spotComments || [],
+      editMode: false
+    }));
+  });
+  upsertSpotSearchEntry(spotId, spotName, m);
+}
+
 async function loadSpots() {
+  const cached = getCachedSpots();
+  if (cached) {
+    cached.forEach((entry) => renderSpotData(entry.id, entry.data));
+    return;
+  }
   try {
     const snapshot = await getDocs(collection(db, SPOTS_COLLECTION));
+    const cacheRows = [];
     snapshot.forEach((docSnap) => {
       const d = docSnap.data();
-      const lat = d.lat ?? d.latitude;
-      const lng = d.lng ?? d.longitude;
-      if (lat == null || lng == null) return;
-      const spotClass = normalizeSpotClass(d.spotClass);
-      const spotComments = Array.isArray(d.comments) ? d.comments : [];
-      const spotName = d.name || 'Unnamed spot';
-      const m = L.marker([lat, lng], { draggable: false, icon: getSpotIcon(spotClass) }).addTo(spotClusterGroup || map);
-      m._spotId = docSnap.id;
-      m._spotClass = spotClass;
-      m._spotComments = spotComments;
-      m.bindPopup(createSpotPopup({ marker: m, spotId: docSnap.id, name: spotName, desc: d.description || '', imageUrl: d.imageUrl || '', spotClass, comments: spotComments, editMode: false }), { minWidth: 220 });
-      upsertSpotSearchEntry(docSnap.id, spotName, m);
+      cacheRows.push({ id: docSnap.id, data: d });
+      renderSpotData(docSnap.id, d);
     });
+    cacheSpotsForSession(cacheRows);
   } catch (err) {
     console.warn('Could not load spots from Firestore:', err);
   }
 }
 
+function clearRenderedSpots() {
+  if (spotClusterGroup && typeof spotClusterGroup.clearLayers === 'function') {
+    spotClusterGroup.clearLayers();
+  } else if (map) {
+    map.eachLayer((layer) => {
+      if (layer && typeof layer.getLatLng === 'function') map.removeLayer(layer);
+    });
+  }
+  spotSearchIndex.length = 0;
+}
+
 let addMode = false;
 
-async function verifyKey() {
-  const key = document.getElementById("keyInput").value;
+async function ensureUserRoleDoc(user) {
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      email: user.email || '',
+      displayName: user.displayName || '',
+      role: 'member',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return 'member';
+  }
+  const data = snap.data() || {};
+  await setDoc(ref, {
+    email: user.email || data.email || '',
+    displayName: user.displayName || data.displayName || '',
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  return normalizeRole(data.role || 'member');
+}
 
-  if (!key.trim()) {
-    document.getElementById("gateError").textContent = 'Please enter a key';
-    document.getElementById("gateError").style.display = 'block';
+function setAuthStatus(message, isError = false) {
+  const authStatus = document.getElementById('authStatus');
+  if (!authStatus) return;
+  authStatus.textContent = message || '';
+  authStatus.style.display = message ? 'block' : 'none';
+  authStatus.style.color = isError ? '#ffb6c3' : '#d9e5ff';
+}
+
+function setSignedInUserUi(user, role) {
+  const userEl = document.getElementById('signedInUser');
+  if (!userEl) return;
+  if (!user) {
+    userEl.textContent = '';
+    userEl.style.display = 'none';
     return;
   }
+  const email = user.email || 'Signed in user';
+  userEl.textContent = `${email} (${roleLabel(role || 'visitor')})`;
+  userEl.style.display = 'block';
+}
 
-  document.getElementById("gateError").style.display = 'none';
+function getUserDisplayLabel(user) {
+  if (!user) return 'Account';
+  if (user.displayName && user.displayName.trim()) return user.displayName.trim();
+  if (user.email && user.email.includes('@')) return user.email.split('@')[0];
+  return 'Account';
+}
 
-  try {
-    let resolvedRole = null;
+function updateAccountMenuUi(user, role) {
+  const wrap = document.getElementById('accountMenuWrap');
+  const nameEl = document.getElementById('accountMenuName');
+  const avatarEl = document.getElementById('accountMenuAvatar');
+  const headerSignInBtn = document.getElementById('headerSignInBtn');
+  const isGuestUser = !!(user && user.isAnonymous);
+  if (headerSignInBtn) headerSignInBtn.style.display = ((!user && guestMode) || isGuestUser) ? 'inline-flex' : 'none';
+  if (!wrap || !nameEl || !avatarEl) return;
+  if (!user || isGuestUser) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const label = getUserDisplayLabel(user);
+  const roleSuffix = role ? ` (${roleLabel(role)})` : '';
+  nameEl.textContent = `${label}${roleSuffix}`;
+  avatarEl.textContent = (label[0] || 'U').toUpperCase();
+  wrap.style.display = 'block';
+  if (headerSignInBtn) headerSignInBtn.style.display = 'none';
+}
 
-    // Fetch role from Firestore keys collection (no hardcoded keys in client code)
-    const docRef = doc(db, "keys", key);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      resolvedRole = docSnap.data().role || null;
-    }
+function closeAccountDropdown() {
+  const dropdown = document.getElementById('accountDropdown');
+  const btn = document.getElementById('accountMenuBtn');
+  if (dropdown) dropdown.style.display = 'none';
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
 
-    if (resolvedRole) {
-      userRole = normalizeRole(resolvedRole);
-      sessionStorage.setItem('mapUnlocked', '1');
-      sessionStorage.setItem('userRole', userRole);
-      document.getElementById("gate").style.display = 'none';
-      if (!map) runMapApp();
-    } else {
-      document.getElementById("gateError").textContent = 'Invalid key';
-      document.getElementById("gateError").style.display = 'block';
-    }
-  } catch (error) {
-    document.getElementById("gateError").textContent = 'Error: ' + error.message;
-    document.getElementById("gateError").style.display = 'block';
+function toggleAccountDropdown() {
+  const dropdown = document.getElementById('accountDropdown');
+  const btn = document.getElementById('accountMenuBtn');
+  if (!dropdown || !btn) return;
+  const open = dropdown.style.display !== 'none';
+  dropdown.style.display = open ? 'none' : 'block';
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+}
+
+function wireAccountMenu() {
+  const menuBtn = document.getElementById('accountMenuBtn');
+  const settingsBtn = document.getElementById('accountSettingsBtn');
+  const signOutBtn = document.getElementById('accountSignOutBtn');
+  if (menuBtn) menuBtn.onclick = (e) => { e.stopPropagation(); toggleAccountDropdown(); };
+  if (settingsBtn) settingsBtn.onclick = () => {
+    closeAccountDropdown();
+    window.location.href = 'settings.html';
+  };
+  if (signOutBtn) signOutBtn.onclick = async () => { closeAccountDropdown(); await signOut(auth); };
+  document.addEventListener('click', () => closeAccountDropdown());
+}
+
+function wireAuthButtons() {
+  const signInBtn = document.getElementById('googleSignInBtn');
+  const signOutBtn = document.getElementById('signOutBtn');
+  const continueGuestBtn = document.getElementById('continueGuestBtn');
+  const headerSignInBtn = document.getElementById('headerSignInBtn');
+  if (signInBtn) {
+    signInBtn.onclick = async () => {
+      setAuthStatus('');
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (error) {
+        setAuthStatus('Google sign-in failed: ' + (error.code || error.message || String(error)), true);
+      }
+    };
+  }
+  if (signOutBtn) {
+    signOutBtn.onclick = async () => {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        setAuthStatus('Sign out failed: ' + (error.code || error.message || String(error)), true);
+      }
+    };
+  }
+  if (continueGuestBtn) {
+    continueGuestBtn.onclick = async () => {
+      guestMode = true;
+      userRole = 'visitor';
+      sessionStorage.setItem('guestMode', '1');
+      setAuthStatus('');
+      try {
+        await signInAnonymously(auth);
+        const gateEl = document.getElementById('gate');
+        if (gateEl) gateEl.style.display = 'none';
+        if (!map) runMapApp();
+      } catch (error) {
+        const code = error && error.code ? String(error.code) : '';
+        if (code === 'auth/admin-restricted-operation') {
+          // Fallback: still allow local visitor mode if anonymous auth is disabled in Firebase.
+          const gateEl = document.getElementById('gate');
+          if (gateEl) gateEl.style.display = 'none';
+          if (!map) runMapApp();
+          setAuthStatus('Guest mode started (local visitor). Enable Anonymous auth in Firebase for full guest auth.', false);
+          return;
+        }
+        setAuthStatus('Guest mode failed: ' + (error.code || error.message || String(error)), true);
+      }
+    };
+  }
+  if (headerSignInBtn) {
+    headerSignInBtn.onclick = async () => {
+      setAuthStatus('');
+      try {
+        guestMode = false;
+        sessionStorage.removeItem('guestMode');
+        await signInWithPopup(auth, googleProvider);
+      } catch (error) {
+        setAuthStatus('Google sign-in failed: ' + (error.code || error.message || String(error)), true);
+      }
+    };
   }
 }
 
-// Expose to global scope for onclick handler
-window.verifyKey = verifyKey;
+function initAuthGate() {
+  const gateEl = document.getElementById('gate');
+  const signInBtn = document.getElementById('googleSignInBtn');
+  const signOutBtn = document.getElementById('signOutBtn');
+  wireAuthButtons();
+  guestMode = sessionStorage.getItem('guestMode') === '1';
+  if (guestMode) {
+    userRole = 'visitor';
+    updateAccountMenuUi(null, null);
+    if (gateEl) gateEl.style.display = 'none';
+    if (!map) runMapApp();
+  }
+  if (sessionStorage.getItem('authSignedIn') === '1' && gateEl) {
+    gateEl.style.display = 'none';
+  }
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      currentUser = null;
+      guestMode = sessionStorage.getItem('guestMode') === '1';
+      userRole = guestMode ? 'visitor' : 'visitor';
+      sessionStorage.removeItem('authSignedIn');
+      if (!guestMode) sessionStorage.removeItem('guestMode');
+      setSignedInUserUi(null, null);
+      updateAccountMenuUi(null, null);
+      if (signInBtn) signInBtn.style.display = 'inline-flex';
+      if (signOutBtn) signOutBtn.style.display = 'none';
+      if (gateEl) gateEl.style.display = guestMode ? 'none' : 'flex';
+      if (guestMode && !map) runMapApp();
+      return;
+    }
+
+      currentUser = user;
+      guestMode = false;
+      sessionStorage.setItem('authSignedIn', '1');
+      sessionStorage.removeItem('guestMode');
+      setAuthStatus('');
+    try {
+      if (user.isAnonymous || guestMode) {
+        userRole = 'visitor';
+      } else {
+        userRole = await ensureUserRoleDoc(user);
+      }
+      sessionStorage.setItem('userRole', normalizeRole(userRole));
+      setSignedInUserUi(user, userRole);
+      updateAccountMenuUi(user, userRole);
+      if (signInBtn) signInBtn.style.display = 'none';
+      if (signOutBtn) signOutBtn.style.display = 'inline-flex';
+      if (gateEl) gateEl.style.display = 'none';
+      if (!map) runMapApp();
+      else {
+        clearRenderedSpots();
+        loadSpots();
+      }
+    } catch (error) {
+      userRole = 'visitor';
+      setSignedInUserUi(user, userRole);
+      updateAccountMenuUi(user, userRole);
+      setAuthStatus('Could not load your role. Defaulting to visitor.', true);
+      if (signInBtn) signInBtn.style.display = 'none';
+      if (signOutBtn) signOutBtn.style.display = 'inline-flex';
+      if (gateEl) gateEl.style.display = 'none';
+      if (!map) runMapApp();
+    }
+  });
+}
 
 function runMapApp() {
   if (!window.L) throw new Error('Leaflet failed to load. Check internet or blocked unpkg.com');
@@ -369,29 +685,22 @@ function runMapApp() {
   // Street
   const street = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { attribution: '© OpenStreetMap contributors' }
+    { attribution: 'Â© OpenStreetMap contributors' }
   );
 
   // Satellite
   const satellite = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Tiles © Esri' }
+    { attribution: 'Tiles Â© Esri' }
   );
 
   // Roads overlay
   const roads = L.tileLayer(
     'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Roads © Esri' }
+    { attribution: 'Roads © Esri', opacity: 0.8 }
   );
-
-  // Town / city names
-  const places = L.tileLayer(
-    'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Places © Esri' }
-  );
-
-  // Hybrid = satellite + roads + places
-  const hybrid = L.layerGroup([satellite, roads, places]);
+  // Hybrid = satellite + major roads (cleaner labels)
+  const hybrid = L.layerGroup([satellite, roads]);
 
   // Default view
   hybrid.addTo(map);
@@ -443,7 +752,7 @@ function runMapApp() {
   loadSpots();
 
   // Add spot button handler (only for non-visitors)
-  if (!isVisitorRole()) {
+  if (canEditSpots()) {
     document.getElementById("addSpotBtn").onclick = () => {
       addMode = true;
       alert("Click on the map to add a spot");
@@ -455,7 +764,7 @@ function runMapApp() {
 
   // Map click handler
   map.on("click", async function (e) {
-    if (isVisitorRole() || !addMode) return;
+    if (!canEditSpots() || !addMode) return;
     const newMarker = L.marker(e.latlng, { draggable: true, icon: getSpotIcon('default') }).addTo(spotClusterGroup || map);
     newMarker._spotClass = 'default';
     newMarker._spotComments = [];
@@ -467,6 +776,11 @@ function runMapApp() {
         <option value="confirmed">&#9989; Confirmed</option>
         <option value="risky">&#128308; Risky</option>
         <option value="unsure">&#128993; Unsure</option>
+      </select>
+      <select id="spotMinRole" class="spot-edit-class spot-create-class">
+        <option value="visitor">Visitor+</option>
+        <option value="member">Member+</option>
+        <option value="editor">Editor+</option>
       </select>
       <input type="text" id="spotName" class="spot-edit-name spot-create-name" placeholder="Name">
       <input type="file" id="spotImage" accept="image/*" style="display:none">
@@ -486,8 +800,9 @@ function runMapApp() {
       const pos = newMarker.getLatLng();
       const fileInput = wrap.querySelector('#spotImage');
       const spotClass = normalizeSpotClass(wrap.querySelector('#spotClass').value);
+      const minRole = normalizeVisibilityRole(wrap.querySelector('#spotMinRole').value);
       try {
-        const ref = await addDoc(collection(db, SPOTS_COLLECTION), { lat: pos.lat, lng: pos.lng, name, description: desc, spotClass, comments: [], createdAt: serverTimestamp() });
+        const ref = await addDoc(collection(db, SPOTS_COLLECTION), { lat: pos.lat, lng: pos.lng, name, description: desc, spotClass, minRole, comments: [], createdAt: serverTimestamp() });
         let imageUrl = '';
         if (fileInput.files[0]) {
           imageUrl = await uploadSpotImage(ref.id, fileInput.files[0]);
@@ -496,9 +811,14 @@ function runMapApp() {
         newMarker._spotId = ref.id;
         newMarker._spotClass = spotClass;
         newMarker._spotComments = [];
+        newMarker._spotName = name;
+        newMarker._spotDesc = desc;
+        newMarker._spotImageUrl = imageUrl;
+        newMarker._spotMinRole = minRole;
         newMarker.dragging.disable();
         newMarker.setIcon(getSpotIcon(spotClass));
-        newMarker.getPopup().setContent(createSpotPopup({ marker: newMarker, spotId: ref.id, name, desc, imageUrl, spotClass, comments: newMarker._spotComments, editMode: false }));
+        newMarker.getPopup().setContent(createSpotPopup({ marker: newMarker, spotId: ref.id, name, desc, imageUrl, spotClass, minRole, comments: newMarker._spotComments, editMode: false }));
+        clearSpotsCache();
         upsertSpotSearchEntry(ref.id, name, newMarker);
         wrap.querySelector('#saveStatus').textContent = 'Saved!';
         wrap.querySelector('#saveStatus').style.color = '#8ec5ff';
@@ -523,14 +843,366 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Toolbar: B, U, Img. Img = open file picker for spot image (pass fileInput). el = contenteditable
+function normalizeLinkUrl(rawUrl) {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return '';
+  if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function showInlineToast(rootEl, message) {
+  if (!rootEl) return;
+  const existing = rootEl.querySelector('.spot-inline-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'spot-inline-toast';
+  toast.textContent = message;
+  rootEl.appendChild(toast);
+  setTimeout(() => {
+    if (toast.parentNode) toast.remove();
+  }, 1500);
+}
+
+function unlinkAnchor(anchor) {
+  if (!anchor || !anchor.parentNode) return;
+  const textNode = document.createTextNode(anchor.textContent || '');
+  anchor.parentNode.replaceChild(textNode, anchor);
+}
+
+function getLinkActionButtonsHtml(includeEdit) {
+  return `
+    ${includeEdit ? `<button type="button" class="spot-link-control-btn spot-link-control-icon-btn" data-action="edit" title="Edit link" aria-label="Edit link">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4zm14.7-11.3c.4-.4.4-1 0-1.4l-2-2a1 1 0 0 0-1.4 0l-1.6 1.6 4 4 1-1.2z"/></svg>
+    </button>` : ''}
+    <button type="button" class="spot-link-control-btn spot-link-control-icon-btn" data-action="copy" title="Copy link" aria-label="Copy link">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16h-9V7h9v14z"/></svg>
+    </button>
+    <button type="button" class="spot-link-control-btn spot-link-control-icon-btn" data-action="open" title="Open in new tab" aria-label="Open in new tab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v2h3.6l-9.8 9.8 1.4 1.4L19 6.4V10h2V3h-7zM5 5h6V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6h-2v6H5V5z"/></svg>
+    </button>
+  `;
+}
+
+function addEditableLinkSupport(editableEl) {
+  if (!editableEl || editableEl.dataset.linkSupportBound === '1') return;
+  editableEl.dataset.linkSupportBound = '1';
+
+  let controls = null;
+  let editor = null;
+  let activeAnchor = null;
+
+  function closeControls() {
+    if (controls) controls.remove();
+    controls = null;
+    activeAnchor = null;
+  }
+
+  function closeEditor() {
+    if (editor) editor.remove();
+    editor = null;
+  }
+
+  function getRangeRect(range) {
+    if (!range) return null;
+    const rects = range.getClientRects();
+    if (rects && rects.length) return rects[0];
+    if (!range.collapsed) return range.getBoundingClientRect();
+    const clone = range.cloneRange();
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    clone.insertNode(marker);
+    const rect = marker.getBoundingClientRect();
+    marker.remove();
+    return rect;
+  }
+
+  function placeFloatingBox(box, targetEl, sourceRange = null) {
+    const parentRect = editableEl.parentNode.getBoundingClientRect();
+    const anchorRect = getRangeRect(sourceRange) || targetEl.getBoundingClientRect();
+    const gap = 8;
+    const minLeft = 6;
+    const maxLeft = Math.max(minLeft, parentRect.width - box.offsetWidth - 6);
+    const left = Math.min(maxLeft, Math.max(minLeft, anchorRect.left - parentRect.left));
+    const preferredTop = anchorRect.top - parentRect.top - box.offsetHeight - gap;
+    const fallbackTop = anchorRect.bottom - parentRect.top + gap;
+    const maxTop = Math.max(0, parentRect.height - box.offsetHeight - 6);
+    const top = preferredTop >= 0 ? preferredTop : fallbackTop;
+    box.style.left = `${left}px`;
+    box.style.top = `${Math.max(0, Math.min(maxTop, top))}px`;
+  }
+
+  function openLinkEditor({ targetAnchor = null, sourceRange = null }) {
+    closeEditor();
+    if (targetAnchor) closeControls();
+    const selectedText = targetAnchor
+      ? (targetAnchor.textContent || '')
+      : (window.getSelection() ? window.getSelection().toString().trim() : '');
+    const selectedHref = targetAnchor
+      ? (targetAnchor.getAttribute('href') || '')
+      : '';
+
+    editor = document.createElement('div');
+    editor.className = 'spot-link-editor';
+    editor.innerHTML = `
+      <label class="spot-link-editor-label">Text</label>
+      <input type="text" class="spot-link-editor-input" data-field="text" placeholder="Link text">
+      <label class="spot-link-editor-label">URL</label>
+      <input type="text" class="spot-link-editor-input" data-field="url" placeholder="https://example.com">
+      <div class="spot-link-editor-actions">
+        <button type="button" class="spot-link-editor-btn" data-action="apply">Apply</button>
+        <button type="button" class="spot-link-editor-btn" data-action="cancel">Cancel</button>
+        ${targetAnchor ? '<button type="button" class="spot-link-editor-btn spot-link-editor-unlink" data-action="unlink">Unlink</button>' : ''}
+      </div>
+    `;
+    editableEl.parentNode.appendChild(editor);
+
+    const textInput = editor.querySelector('[data-field="text"]');
+    const urlInput = editor.querySelector('[data-field="url"]');
+    textInput.value = selectedText;
+    urlInput.value = selectedHref || 'https://';
+    placeFloatingBox(editor, targetAnchor || editableEl, sourceRange);
+    textInput.focus();
+
+    editor.addEventListener('click', (e) => {
+      const action = e.target.getAttribute('data-action');
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'cancel') {
+        closeEditor();
+        return;
+      }
+      if (action === 'unlink' && targetAnchor) {
+        unlinkAnchor(targetAnchor);
+        closeEditor();
+        return;
+      }
+      if (action !== 'apply') return;
+
+      const nextText = (textInput.value || '').trim();
+      const nextHref = normalizeLinkUrl(urlInput.value || '');
+      if (!nextHref) return;
+
+      if (targetAnchor) {
+        targetAnchor.textContent = nextText || nextHref;
+        targetAnchor.href = nextHref;
+        targetAnchor.target = '_blank';
+        targetAnchor.rel = 'noopener noreferrer';
+        closeEditor();
+        return;
+      }
+
+      editableEl.focus();
+      const sel = window.getSelection();
+      if (!sel) return;
+      sel.removeAllRanges();
+      if (sourceRange) sel.addRange(sourceRange);
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+
+      const anchor = document.createElement('a');
+      anchor.href = nextHref;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.textContent = nextText || nextHref;
+
+      if (!range.collapsed) range.deleteContents();
+      range.insertNode(anchor);
+      range.setStartAfter(anchor);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      closeEditor();
+    });
+  }
+
+  function openControls(anchor) {
+    closeControls();
+    closeEditor();
+    activeAnchor = anchor;
+    controls = document.createElement('div');
+    controls.className = 'spot-link-controls';
+    controls.innerHTML = getLinkActionButtonsHtml(true);
+    editableEl.parentNode.appendChild(controls);
+    placeFloatingBox(controls, anchor);
+  }
+
+  editableEl.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a || !editableEl.contains(a)) {
+      closeControls();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    openControls(a);
+  });
+
+  if (!activeLinkControlsCloser) {
+    activeLinkControlsCloser = (evt) => {
+      const t = evt && evt.target;
+      if (t && typeof t.closest === 'function') {
+        if (t.closest('.spot-link-editor')) return;
+        if (t.closest('.spot-link-controls')) return;
+        if (t.closest('.spot-desc-toolbar')) return;
+      }
+      document.querySelectorAll('.spot-link-controls').forEach((el) => el.remove());
+      document.querySelectorAll('.spot-link-editor').forEach((el) => el.remove());
+    };
+    document.addEventListener('click', activeLinkControlsCloser);
+  }
+
+  editableEl.parentNode.addEventListener('click', (e) => {
+    if (!controls || !controls.contains(e.target)) return;
+    const actionEl = e.target.closest('[data-action]');
+    const action = actionEl ? actionEl.getAttribute('data-action') : null;
+    if (!action || !activeAnchor) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (action === 'edit') {
+      openLinkEditor({ targetAnchor: activeAnchor });
+      closeControls();
+      return;
+    }
+    if (action === 'copy') {
+      const href = activeAnchor.href || activeAnchor.getAttribute('href') || '';
+      if (!href) return;
+      copyTextToClipboard(href).then((copied) => {
+        showInlineToast(editableEl.parentNode, copied ? 'Copied link to clipboard' : 'Could not copy link');
+      }).catch(() => {
+        showInlineToast(editableEl.parentNode, 'Could not copy link');
+      });
+      return;
+    }
+    if (action === 'open') {
+      const href = activeAnchor.href || activeAnchor.getAttribute('href') || '';
+      if (!href) return;
+      window.open(href, '_blank', 'noopener,noreferrer');
+    }
+  });
+
+  return {
+    openNewLinkEditor() {
+      editableEl.focus();
+      const sel = window.getSelection();
+      let savedRange = null;
+      if (sel && sel.rangeCount) {
+        const candidate = sel.getRangeAt(0);
+        if (editableEl.contains(candidate.commonAncestorContainer)) {
+          savedRange = candidate.cloneRange();
+        }
+      }
+      if (!savedRange) {
+        savedRange = document.createRange();
+        savedRange.selectNodeContents(editableEl);
+        savedRange.collapse(false);
+      }
+      openLinkEditor({ sourceRange: savedRange });
+    }
+  };
+}
+
+function addViewOnlyLinkSupport(rootEl, options = {}) {
+  if (!rootEl) return;
+  const descEl = rootEl.querySelector('.spot-desc');
+  if (!descEl || descEl.dataset.viewLinkBound === '1') return;
+  descEl.dataset.viewLinkBound = '1';
+  let controls = null;
+  let activeAnchor = null;
+  const onEditLink = typeof options.onEditLink === 'function' ? options.onEditLink : null;
+
+  function closeControls() {
+    if (controls) controls.remove();
+    controls = null;
+    activeAnchor = null;
+  }
+
+  function placeViewControls(anchor) {
+    if (!controls || !anchor) return;
+    const parentRect = rootEl.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    const gap = 8;
+    const minLeft = 6;
+    const maxLeft = Math.max(minLeft, parentRect.width - controls.offsetWidth - 6);
+    const left = Math.min(maxLeft, Math.max(minLeft, anchorRect.left - parentRect.left));
+    const preferredTop = anchorRect.top - parentRect.top - controls.offsetHeight - gap;
+    const fallbackTop = anchorRect.bottom - parentRect.top + gap;
+    controls.style.left = `${left}px`;
+    controls.style.top = `${preferredTop >= 0 ? preferredTop : fallbackTop}px`;
+  }
+
+  function openControls(anchor) {
+    closeControls();
+    activeAnchor = anchor;
+    controls = document.createElement('div');
+    controls.className = 'spot-link-controls';
+    controls.innerHTML = getLinkActionButtonsHtml(!!onEditLink);
+    rootEl.appendChild(controls);
+    placeViewControls(anchor);
+  }
+
+  descEl.addEventListener('click', (e) => {
+    const anchor = e.target.closest('a');
+    if (!anchor || !descEl.contains(anchor)) {
+      closeControls();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    openControls(anchor);
+  });
+
+  rootEl.addEventListener('click', (e) => {
+    if (!controls || !controls.contains(e.target)) return;
+    const actionEl = e.target.closest('[data-action]');
+    const action = actionEl ? actionEl.getAttribute('data-action') : null;
+    if (!action || !activeAnchor) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const href = activeAnchor.href || activeAnchor.getAttribute('href') || '';
+    if (action === 'edit' && onEditLink) {
+      onEditLink();
+      return;
+    }
+    if (action === 'copy') {
+      if (!href) return;
+      copyTextToClipboard(href).then((copied) => {
+        showInlineToast(rootEl, copied ? 'Copied link to clipboard' : 'Could not copy link');
+      }).catch(() => {
+        showInlineToast(rootEl, 'Could not copy link');
+      });
+      return;
+    }
+    if (action === 'open') {
+      if (!href) return;
+      window.open(href, '_blank', 'noopener,noreferrer');
+    }
+  });
+
+  if (!activeLinkControlsCloser) {
+    activeLinkControlsCloser = (evt) => {
+      const t = evt && evt.target;
+      if (t && typeof t.closest === 'function') {
+        if (t.closest('.spot-link-editor')) return;
+        if (t.closest('.spot-link-controls')) return;
+        if (t.closest('.spot-desc-toolbar')) return;
+      }
+      document.querySelectorAll('.spot-link-controls').forEach((el) => el.remove());
+      document.querySelectorAll('.spot-link-editor').forEach((el) => el.remove());
+    };
+    document.addEventListener('click', activeLinkControlsCloser);
+  };
+}
+
+// Toolbar: B, U, Link, Img. Img = open file picker for spot image (pass fileInput). el = contenteditable
 function addDescToolbar(el, spotImageInput) {
   const bar = document.createElement('div');
   bar.className = 'spot-desc-toolbar';
-  bar.innerHTML = '<button type="button" class="spot-desc-tool-btn">B</button> <button type="button" class="spot-desc-tool-btn">U</button> <button type="button" class="spot-desc-tool-btn">Img</button>';
+  bar.innerHTML = '<button type="button" class="spot-desc-tool-btn">B</button> <button type="button" class="spot-desc-tool-btn">U</button> <button type="button" class="spot-desc-tool-btn">Link</button> <button type="button" class="spot-desc-tool-btn">Img</button>';
+  const linkSupport = addEditableLinkSupport(el);
   bar.querySelectorAll('button')[0].onclick = () => { el.focus(); document.execCommand('bold'); };
   bar.querySelectorAll('button')[1].onclick = () => { el.focus(); document.execCommand('underline'); };
-  bar.querySelectorAll('button')[2].onclick = () => { if (spotImageInput) spotImageInput.click(); else { const u = prompt('Image URL:'); if (u) { el.focus(); document.execCommand('insertHTML', false, '<img src="'+u+'" style="max-width:100%">'); } } };
+  bar.querySelectorAll('button')[2].onclick = () => { if (linkSupport) linkSupport.openNewLinkEditor(); };
+  bar.querySelectorAll('button')[3].onclick = () => { if (spotImageInput) spotImageInput.click(); else { const u = prompt('Image URL:'); if (u) { el.focus(); document.execCommand('insertHTML', false, '<img src="'+u+'" style="max-width:100%">'); } } };
   el.before(bar);
 }
 
@@ -560,7 +1232,7 @@ function formatCommentTime(value) {
 }
 
 
-function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comments = [], editMode, activePane = 'details' }) {
+function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, minRole = 'visitor', comments = [], editMode, activePane = 'details' }) {
   const wrap = document.createElement('div');
   wrap.className = 'spot-popup-view';
   if (!editMode) {
@@ -573,7 +1245,7 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
       : '';
     const currentComments = Array.isArray(comments) ? comments : [];
     const imageBlockHtml = imageUrl ? `<div class="spot-popup-title-row"><img class="spot-thumb" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}"></div>` : '';
-    const editButtonHtml = !isVisitorRole() ? '<button type="button" class="edit-spot-btn">Edit</button>' : '';
+    const editButtonHtml = canEditSpots() ? '<button type="button" class="edit-spot-btn">Edit</button>' : '';
     const commentsCount = currentComments.length;
     const detailsActiveClass = activePane === 'comments' ? '' : 'is-active';
     const commentsActiveClass = activePane === 'comments' ? 'is-active' : '';
@@ -620,18 +1292,27 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
         <div class="spot-maps-link-wrap">${mapsLinkHtml}</div>
       </div>`;
 
-    if (!isVisitorRole()) {
+    if (canEditSpots()) {
       const editBtn = wrap.querySelector('.edit-spot-btn');
       if (editBtn) {
         editBtn.onclick = e => {
           e.preventDefault(); e.stopPropagation();
-          marker.getPopup().setContent(createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comments: currentComments, editMode: true }));
+          marker.getPopup().setContent(createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, minRole: marker._spotMinRole || minRole, comments: currentComments, editMode: true }));
           marker.getPopup().openPopup();
           marker.dragging.enable();
           marker.once('dragstart', () => marker.getPopup().closePopup());
         };
       }
     }
+
+    addViewOnlyLinkSupport(wrap, {
+      onEditLink: canEditSpots() ? () => {
+        marker.getPopup().setContent(createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, minRole: marker._spotMinRole || minRole, comments: currentComments, editMode: true }));
+        marker.getPopup().openPopup();
+        marker.dragging.enable();
+        marker.once('dragstart', () => marker.getPopup().closePopup());
+      } : null
+    });
 
     const thumb = wrap.querySelector('.spot-thumb');
     if (thumb) thumb.onclick = e => { e.stopPropagation(); showImageOverlay(imageUrl); };
@@ -683,6 +1364,7 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
             desc,
             imageUrl,
             spotClass,
+            minRole: marker._spotMinRole || minRole,
             comments: marker._spotComments,
             editMode: false,
             activePane: 'comments'
@@ -717,6 +1399,7 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
               desc,
               imageUrl,
               spotClass,
+              minRole: marker._spotMinRole || minRole,
               comments: marker._spotComments,
               editMode: false,
               activePane: 'comments'
@@ -742,6 +1425,11 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
         <option value="risky">&#128308; Risky</option>
         <option value="unsure">&#128993; Unsure</option>
       </select>
+      <select class="spot-edit-min-role">
+        <option value="visitor">Visitor+</option>
+        <option value="member">Member+</option>
+        <option value="editor">Editor+</option>
+      </select>
       <input type="file" class="spot-edit-image" accept="image/*" style="display:none">
       <div class="spot-edit-desc" contenteditable>${desc || ''}</div>
       <button type="button" class="save-edit-spot-btn">Save</button>
@@ -750,21 +1438,29 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
     // Set current class from data, with backward compatibility for older values.
     const classSel = wrap.querySelector('.spot-edit-class');
     classSel.value = normalizeSpotClass(spotClass || marker._spotClass);
+    const minRoleSel = wrap.querySelector('.spot-edit-min-role');
+    minRoleSel.value = normalizeVisibilityRole(minRole || marker._spotMinRole || 'visitor');
     const descEl = wrap.querySelector('.spot-edit-desc');
     addDescToolbar(descEl, wrap.querySelector('.spot-edit-image'));
     wrap.querySelector('.save-edit-spot-btn').onclick = async () => {
       const newName = (wrap.querySelector('.spot-edit-name').value.trim()) || 'Unnamed spot';
       const newClass = normalizeSpotClass(classSel.value);
+      const newMinRole = normalizeVisibilityRole(minRoleSel.value);
       const fileInput = wrap.querySelector('.spot-edit-image');
       let newImageUrl = imageUrl || '';
       try {
         if (fileInput.files[0]) newImageUrl = await uploadSpotImage(spotId, fileInput.files[0]);
-        await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { lat: marker.getLatLng().lat, lng: marker.getLatLng().lng, name: newName, description: descEl.innerHTML, imageUrl: newImageUrl, spotClass: newClass, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, SPOTS_COLLECTION, spotId), { lat: marker.getLatLng().lat, lng: marker.getLatLng().lng, name: newName, description: descEl.innerHTML, imageUrl: newImageUrl, spotClass: newClass, minRole: newMinRole, updatedAt: serverTimestamp() });
         marker.dragging.disable();
         marker._spotClass = newClass;
+        marker._spotName = newName;
+        marker._spotDesc = descEl.innerHTML;
+        marker._spotImageUrl = newImageUrl;
+        marker._spotMinRole = newMinRole;
         marker.setIcon(getSpotIcon(newClass));
+        clearSpotsCache();
         upsertSpotSearchEntry(spotId, newName, marker);
-        marker.getPopup().setContent(createSpotPopup({ marker, spotId, name: newName, desc: descEl.innerHTML, imageUrl: newImageUrl, spotClass: newClass, comments: marker._spotComments || [], editMode: false }));
+        marker.getPopup().setContent(createSpotPopup({ marker, spotId, name: newName, desc: descEl.innerHTML, imageUrl: newImageUrl, spotClass: newClass, minRole: newMinRole, comments: marker._spotComments || [], editMode: false }));
       } catch (err) {
         wrap.querySelector('.edit-status').textContent = 'Error: ' + (err.code || err.message || String(err));
         wrap.querySelector('.edit-status').style.color = 'red';
@@ -775,6 +1471,7 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
       try {
         const { deleteDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         await deleteDoc(doc(db, SPOTS_COLLECTION, spotId));
+        clearSpotsCache();
         removeSpotSearchEntry(spotId);
         if (spotClusterGroup && spotClusterGroup.hasLayer(marker)) {
           spotClusterGroup.removeLayer(marker);
@@ -789,9 +1486,6 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, comm
   return wrap;
 }
 
-// Check if already unlocked
-if (sessionStorage.getItem('mapUnlocked') === '1') {
-  userRole = normalizeRole(sessionStorage.getItem('userRole'));
-  document.getElementById("gate").style.display = 'none';
-  runMapApp();
-}
+wireAccountMenu();
+initAuthGate();
+

@@ -1,0 +1,105 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Urbex Alberta</title>
+  <link rel="icon" type="image/png" href="Logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="settings-page">
+  <header>
+    <div class="header-brand">
+      <img src="Logo.png" alt="Urbex Alberta logo" class="header-logo-icon">
+      <span>Urbex Alberta</span>
+    </div>
+    <div class="header-center">
+      <a href="index.html" class="top-nav-link">Map</a>
+      <a href="resources.html" class="top-nav-link">Resources</a>
+    </div>
+    <div class="header-right">
+    <div id="settingsAccountWrap" class="account-menu-wrap" style="display:none;">
+      <button id="settingsAccountBtn" class="account-menu-btn" type="button" aria-expanded="false">
+        <span id="settingsAccountName" class="account-menu-name">Account</span>
+        <span id="settingsAccountAvatar" class="account-menu-avatar">U</span>
+      </button>
+      <div id="settingsAccountDropdown" class="account-dropdown" style="display:none;">
+        <button id="settingsSignOutBtn" class="account-dropdown-item account-dropdown-item-danger" type="button">Sign Out</button>
+      </div>
+    </div>
+    </div>
+  </header>
+
+  <main class="settings-layout">
+    <aside class="settings-sidebar">
+      <div class="settings-profile-card">
+      <div class="settings-profile-avatar" id="settingsProfileAvatar">U</div>
+      <div class="settings-profile-name" id="settingsProfileName">Loading...</div>
+      <div class="settings-profile-meta" id="settingsProfileMeta"></div>
+      <div class="settings-profile-meta" id="settingsProfileJoined"></div>
+    </div>
+      <button class="settings-nav-item is-active" type="button" data-tab="account">Account Settings</button>
+      <button class="settings-nav-item" type="button" data-tab="profile">Profile</button>
+      <button class="settings-nav-item" type="button" data-tab="privacy">Privacy</button>
+      <button class="settings-nav-item" type="button" data-tab="roles">Role Dashboard</button>
+    </aside>
+    <section class="settings-panel-main">
+      <div class="settings-tab-panel is-active" data-panel="account">
+        <div class="settings-panel-head">
+          <h1>Account Settings</h1>
+        </div>
+        <div class="settings-form-grid">
+          <label for="settingsDisplayNameInput">Display Name</label>
+          <input id="settingsDisplayNameInput" type="text" maxlength="60" placeholder="Your display name">
+
+          <label for="settingsEmailInput">Account Email</label>
+          <input id="settingsEmailInput" type="email" disabled>
+        </div>
+      </div>
+      <div class="settings-tab-panel" data-panel="profile">
+        <div class="settings-panel-head">
+          <h1>Profile</h1>
+        </div>
+        <div class="settings-form-grid">
+          <label for="settingsProfileBioInput">Bio</label>
+          <input id="settingsProfileBioInput" type="text" maxlength="120" placeholder="Short bio (optional)">
+        </div>
+      </div>
+      <div class="settings-tab-panel" data-panel="privacy">
+        <div class="settings-panel-head">
+          <h1>Privacy</h1>
+        </div>
+        <div class="settings-form-grid">
+          <label>Visibility</label>
+          <input value="Private profile (coming soon)" disabled>
+        </div>
+      </div>
+      <div class="settings-tab-panel" data-panel="roles">
+        <div class="settings-panel-head">
+          <h1>Role Dashboard</h1>
+        </div>
+        <p class="settings-role-note">Admin only. Change member roles and keep an audit trail.</p>
+        <div id="roleDashboardBlock">
+          <div class="settings-role-table-wrap">
+            <table class="settings-role-table">
+              <thead>
+                <tr><th>User</th><th>Current Role</th><th>Set Role</th><th>Action</th></tr>
+              </thead>
+              <tbody id="roleUsersTableBody"></tbody>
+            </table>
+          </div>
+          <h2 class="settings-audit-title">Recent Role Changes</h2>
+          <div id="roleAuditList" class="settings-audit-list"></div>
+        </div>
+      </div>
+      <p id="settingsStatusText" class="account-settings-status"></p>
+      <div class="settings-actions">
+        <button id="settingsSaveBtn" type="button">Save Changes</button>
+        <button id="settingsBackBtn" type="button" class="account-settings-cancel">Back to Map</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

@@ -1,15 +1,35 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Urbex Resources</title>
+  <title>Urbex Alberta</title>
+  <link rel="icon" type="image/png" href="Logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="resources-page">
   <header>
-    <a href="index.html" class="top-nav-link">Map</a>
-    <a href="resources.html" class="top-nav-link is-active">Resources</a>
+    <div class="header-brand">
+      <img src="Logo.png" alt="Urbex Alberta logo" class="header-logo-icon">
+      <span>Urbex Alberta</span>
+    </div>
+    <div class="header-center">
+      <a href="index.html" class="top-nav-link">Map</a>
+      <a href="resources.html" class="top-nav-link is-active">Resources</a>
+    </div>
+    <div class="header-right">
+    <div id="accountMenuWrap" class="account-menu-wrap" style="display:none;">
+      <button id="accountMenuBtn" class="account-menu-btn" type="button" aria-expanded="false">
+        <span id="accountMenuName" class="account-menu-name">Account</span>
+        <span id="accountMenuAvatar" class="account-menu-avatar">U</span>
+      </button>
+      <div id="accountDropdown" class="account-dropdown" style="display:none;">
+        <button id="accountSettingsBtn" class="account-dropdown-item" type="button">Settings</button>
+        <button id="accountSignOutBtn" class="account-dropdown-item account-dropdown-item-danger" type="button">Sign Out</button>
+      </div>
+    </div>
+    <button id="headerSignInBtn" class="account-menu-btn" type="button" style="display:none;">Sign in</button>
+    </div>
   </header>
 
   <main class="resources-main">
@@ -64,5 +84,6 @@
       </details>
     </section>
   </main>
+  <script type="module" src="resources.js"></script>
 </body>
 </html>
