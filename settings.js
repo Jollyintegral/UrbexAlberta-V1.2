@@ -85,6 +85,37 @@ function wireMenu() {
   };
 }
 
+function wireMobileMenu() {
+  const toggle = document.querySelector('.mobile-menu-button');
+  const header = document.querySelector('header');
+  if (!toggle || !header) return;
+
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = header.classList.toggle('mobile-menu-open');
+    toggle.classList.toggle('is-active', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  const drawerClose = document.querySelector('.drawer-close-button');
+  if (drawerClose) {
+    drawerClose.addEventListener('click', (event) => {
+      event.stopPropagation();
+      header.classList.remove('mobile-menu-open');
+      toggle.classList.remove('is-active');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    if (header.classList.contains('mobile-menu-open') && !header.contains(event.target)) {
+      header.classList.remove('mobile-menu-open');
+      toggle.classList.remove('is-active');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
 async function loadRole(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
   currentUserDoc = snap.data() || null;
@@ -281,5 +312,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 wireMenu();
+wireMobileMenu();
 wireForm();
 wireTabs();

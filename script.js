@@ -680,7 +680,7 @@ function runMapApp() {
   if (!window.L) throw new Error('Leaflet failed to load. Check internet or blocked unpkg.com');
 
   // Create the map
-  map = L.map('map').setView([53.5444, -113.4909], 12);
+  map = L.map('map', { zoomControl: false }).setView([53.5444, -113.4909], 12);
 
   // Street
   const street = L.tileLayer(
@@ -1487,5 +1487,37 @@ function createSpotPopup({ marker, spotId, name, desc, imageUrl, spotClass, minR
 }
 
 wireAccountMenu();
+function wireMobileMenu() {
+  const toggle = document.querySelector('.mobile-menu-button');
+  const header = document.querySelector('header');
+  if (!toggle || !header) return;
+
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = header.classList.toggle('mobile-menu-open');
+    toggle.classList.toggle('is-active', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  const drawerClose = document.querySelector('.drawer-close-button');
+  if (drawerClose) {
+    drawerClose.addEventListener('click', (event) => {
+      event.stopPropagation();
+      header.classList.remove('mobile-menu-open');
+      toggle.classList.remove('is-active');
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    if (header.classList.contains('mobile-menu-open') && !header.contains(event.target)) {
+      header.classList.remove('mobile-menu-open');
+      toggle.classList.remove('is-active');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+wireMobileMenu();
 initAuthGate();
 

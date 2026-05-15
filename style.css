@@ -69,6 +69,7 @@ header a {
   header {
     padding: 8px 6px;
     font-size: 13px;
+    overflow: visible;
   }
   #addSpotBtn {
     position: fixed !important;
@@ -90,6 +91,9 @@ header a {
     border: 2px solid #222;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     z-index: 1000 !important;
+  }
+  .leaflet-control-zoom {
+    display: none !important;
   }
   .gate-box {
     min-width: 0;
@@ -1145,6 +1149,65 @@ header {
   text-shadow: 0 0 16px rgba(143, 163, 255, 0.24);
 }
 
+header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mobile-menu-button {
+  display: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.mobile-menu-button span,
+.mobile-menu-button span::before,
+.mobile-menu-button span::after {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
+  position: relative;
+}
+
+.mobile-menu-button span::before {
+  position: absolute;
+  top: -6px;
+}
+
+.mobile-menu-button span::after {
+  position: absolute;
+  top: 6px;
+}
+
+.mobile-menu-button.is-active span {
+  transform: rotate(45deg);
+}
+
+.mobile-menu-button.is-active span::before {
+  top: 0;
+  transform: rotate(90deg);
+}
+
+.mobile-menu-button.is-active span::after {
+  top: 0;
+  opacity: 0;
+}
+
 .header-logo-icon {
   width: 28px;
   height: 28px;
@@ -1162,6 +1225,10 @@ header {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.mobile-drawer-header {
+  display: none;
 }
 
 .header-right {
@@ -1665,20 +1732,150 @@ header {
 
 @media (max-width: 700px) {
   header {
-    padding: 9px 10px;
+    padding: 10px 10px 8px;
+    overflow: visible;
   }
 
   .header-brand {
     font-size: 14px;
   }
 
+  .mobile-menu-button {
+    display: inline-flex;
+    order: 0;
+  }
+
+  header {
+    flex-wrap: nowrap;
+  }
+
+  .header-brand {
+    order: 1;
+  }
+
+  .header-right {
+    order: 2;
+  }
+
+  .mobile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .header-center {
-    gap: 10px;
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: auto;
+    bottom: 0;
+    height: 100vh;
+    min-height: 100vh;
+    width: min(62vw, 290px);
+    max-width: 280px;
+    padding: 28px 18px 18px;
+    box-sizing: border-box;
+    background: linear-gradient(to left, rgba(4, 6, 12, 0.98), rgba(4, 6, 12, 0.72));
+    backdrop-filter: blur(24px);
+    box-shadow: inset 14px 0 34px rgba(0, 0, 0, 0.45), -18px 0 44px rgba(0, 0, 0, 0.55);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-top-left-radius: 26px;
+    border-bottom-left-radius: 26px;
+    z-index: 6500;
+    overflow-y: auto;
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.28s ease, opacity 0.28s ease;
+    flex-direction: column;
+  }
+
+  header.mobile-menu-open .header-center {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .header-center a {
-    font-size: 16px;
-    margin-right: 0;
+    font-size: 15px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 0;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .header-center a:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .mobile-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .drawer-logo-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .drawer-close-button {
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .drawer-close-button:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .header-brand span {
+    display: none;
+  }
+
+  .header-brand {
+    gap: 0;
+    order: 1;
+  }
+
+  .account-menu-name {
+    display: none;
+  }
+
+  .account-menu-btn {
+    padding: 0;
+    min-width: auto;
+    width: 40px;
+    height: 40px;
+  }
+
+  .account-menu-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .header-right {
+    margin-left: auto;
   }
 
   #addSpotBtn {
@@ -1689,7 +1886,7 @@ header {
   }
 
   .account-menu-name {
-    max-width: 120px;
+    max-width: 0;
   }
 
   #googleSignInBtn {
