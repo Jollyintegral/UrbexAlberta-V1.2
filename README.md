@@ -1,4 +1,4 @@
-# Urbex-Alberta-V1.3
+# Urbex-Alberta-V1.4
 **Quick Information**
 The site may need a minute to load when first opening, after loading, it should be good. 
 The site may be laggy, have certain bugs, this is a BETA version, in developing.
@@ -22,7 +22,7 @@ The map is publicly viewable, but certain features may require a role or access 
 
 Roles & Permissions:
 - Viewer: Can browse locations on the map
-- High Rank (HR): Full map control, helping manage and put together this site, protect the site.
+- Member: Default when signing in. Standard permission
 - Admin: Full control over the map, locations, and user access.
 - Owner: All ranks, can edit code, etc. (I am the owner, the only owner and developer).
 
@@ -48,3 +48,4 @@ If you have any questions, or concerns, feel free to DM me on discord, my user i
 This map is made using a Google Firebase Dataset and "Leaflet" OSM data.
 **Extra**:
 Previous versions such as "Urbex Alberta V1.1" were archived and can not be published.
+All important data is backed up securely.
